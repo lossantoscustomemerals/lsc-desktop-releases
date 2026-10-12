@@ -1,0 +1,78 @@
+# Copy only this generic workflow and ci-decrypt-input.mjs to the public release repository.
+# It runs on the standard free macOS runner for public repositories, never a larger runner.
+name: Build private LSC iPhone input
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Private source commit (40 hexadecimal characters)
+        type: string
+        required: true
+      encrypted_sha256:
+        description: SHA256 of the authenticated encrypted input
+        type: string
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: lsc-iphone-build
+  cancel-in-progress: false
+jobs:
+  device-ipa:
+    if: github.repository == 'lossantoscustomemerals/lsc-desktop-releases'
+    runs-on: macos-15
+    timeout-minutes: 20
+    env:
+      LSC_IOS_SOURCE_SHA: ${{ inputs.source_sha }}
+      LSC_IOS_INPUT_SHA256: ${{ inputs.encrypted_sha256 }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Select Xcode 26 and validate the input identifier
+        shell: bash
+        run: |
+          [[ "$LSC_IOS_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$LSC_IOS_INPUT_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          xcode_path="$(find /Applications -maxdepth 1 -type d -name 'Xcode_26*.app' | sort -V | tail -n 1)"
+          test -n "$xcode_path"
+          echo "DEVELOPER_DIR=$xcode_path/Contents/Developer" >> "$GITHUB_ENV"
+      - name: Download authenticated encrypted source input
+        shell: bash
+        env:
+          LSC_IOS_BUILD_KEY: ${{ secrets.LSC_IOS_BUILD_KEY }}
+        run: |
+          curl --fail --location --silent --show-error --retry 2 \
+            "https://github.com/lossantoscustomemerals/lsc-desktop-releases/releases/download/ios-build-source-$LSC_IOS_SOURCE_SHA/lsc-ios-source.enc" \
+            --output "$RUNNER_TEMP/lsc-ios-source.enc"
+          node scripts/ci-decrypt-input.mjs "$RUNNER_TEMP/lsc-ios-source.enc" "$RUNNER_TEMP/lsc-ios-source.tar.gz"
+          mkdir "$RUNNER_TEMP/lsc-ios-build"
+          tar -xzf "$RUNNER_TEMP/lsc-ios-source.tar.gz" -C "$RUNNER_TEMP/lsc-ios-build"
+          node -e 'const fs=require("fs"); const p=process.env.RUNNER_TEMP+"/lsc-ios-build/mobile/package.json"; if(JSON.parse(fs.readFileSync(p)).name!=="lscustom-mobile")process.exit(1)'
+      - name: Install dependencies and build the local app UI
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP/lsc-ios-build"
+          npm ci --no-audit --no-fund --loglevel=error
+          npm ci --prefix mobile --no-audit --no-fund --loglevel=error
+          npm run build --prefix mobile
+      - name: Compile and validate the arm64 iPhone package
+        shell: bash
+        env:
+          LSC_IOS_OUTPUT_DIR: ${{ runner.temp }}/lsc-ios-artifacts
+        run: |
+          cd "$RUNNER_TEMP/lsc-ios-build"
+          bash mobile/scripts/build-sideload.sh
+      - name: Upload only the installable package and validation report
+        uses: actions/upload-artifact@v4
+        with:
+          name: lsc-ios-sideload-${{ github.run_number }}
+          path: |
+            ${{ runner.temp }}/lsc-ios-artifacts/*.ipa
+            ${{ runner.temp }}/lsc-ios-artifacts/ipa-validation.json
+            ${{ runner.temp }}/lsc-ios-artifacts/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 3
