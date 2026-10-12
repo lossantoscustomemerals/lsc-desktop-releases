@@ -52,6 +52,7 @@ jobs:
           mkdir "$RUNNER_TEMP/lsc-ios-build"
           tar -xzf "$RUNNER_TEMP/lsc-ios-source.tar.gz" -C "$RUNNER_TEMP/lsc-ios-build"
           node -e 'const fs=require("fs"); const p=process.env.RUNNER_TEMP+"/lsc-ios-build/mobile/package.json"; if(JSON.parse(fs.readFileSync(p)).name!=="lscustom-mobile")process.exit(1)'
+          node -e 'const fs=require("fs");const p=process.env.RUNNER_TEMP+"/lsc-ios-build/mobile/scripts/build-sideload.sh";fs.writeFileSync(p,fs.readFileSync(p,"utf8").replace(/\r\n/g,"\n"))'
       - name: Install dependencies and build the local app UI
         shell: bash
         run: |
