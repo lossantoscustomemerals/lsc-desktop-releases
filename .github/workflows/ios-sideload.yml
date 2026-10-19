@@ -21,7 +21,7 @@ jobs:
   device-ipa:
     if: github.repository == 'lossantoscustomemerals/lsc-desktop-releases'
     runs-on: macos-15
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       LSC_IOS_SOURCE_SHA: ${{ inputs.source_sha }}
       LSC_IOS_INPUT_SHA256: ${{ inputs.encrypted_sha256 }}
@@ -52,7 +52,7 @@ jobs:
           mkdir "$RUNNER_TEMP/lsc-ios-build"
           tar -xzf "$RUNNER_TEMP/lsc-ios-source.tar.gz" -C "$RUNNER_TEMP/lsc-ios-build"
           node -e 'const fs=require("fs"); const p=process.env.RUNNER_TEMP+"/lsc-ios-build/mobile/package.json"; if(JSON.parse(fs.readFileSync(p)).name!=="lscustom-mobile")process.exit(1)'
-          node -e 'const fs=require("fs");const p=process.env.RUNNER_TEMP+"/lsc-ios-build/mobile/scripts/build-sideload.sh";fs.writeFileSync(p,fs.readFileSync(p,"utf8").replace(/\r\n/g,"\n"))'
+          node -e 'const fs=require("fs");for(const name of ["build-sideload.sh","test-native-ui.sh"]){const p=process.env.RUNNER_TEMP+"/lsc-ios-build/mobile/scripts/"+name;fs.writeFileSync(p,fs.readFileSync(p,"utf8").replace(/\r\n/g,"\n"))}'
       - name: Install dependencies and build the local app UI
         shell: bash
         run: |
@@ -67,6 +67,13 @@ jobs:
         run: |
           cd "$RUNNER_TEMP/lsc-ios-build"
           bash mobile/scripts/build-sideload.sh
+      - name: Verify actual native iPhone screens on the iOS Simulator
+        shell: bash
+        env:
+          LSC_IOS_OUTPUT_DIR: ${{ runner.temp }}/lsc-ios-artifacts
+        run: |
+          cd "$RUNNER_TEMP/lsc-ios-build"
+          bash mobile/scripts/test-native-ui.sh
       - name: Upload only the installable package and validation report
         uses: actions/upload-artifact@v4
         with:
@@ -74,6 +81,9 @@ jobs:
           path: |
             ${{ runner.temp }}/lsc-ios-artifacts/*.ipa
             ${{ runner.temp }}/lsc-ios-artifacts/ipa-validation.json
+            ${{ runner.temp }}/lsc-ios-artifacts/signature-preflight.json
             ${{ runner.temp }}/lsc-ios-artifacts/SHA256SUMS.txt
+            ${{ runner.temp }}/lsc-ios-artifacts/native-ui-validation.json
+            ${{ runner.temp }}/lsc-ios-artifacts/native-ui-screenshots/*.png
           if-no-files-found: error
           retention-days: 3
