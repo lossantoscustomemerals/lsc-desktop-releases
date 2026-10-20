@@ -87,3 +87,13 @@ jobs:
             ${{ runner.temp }}/lsc-ios-artifacts/native-ui-screenshots/*.png
           if-no-files-found: error
           retention-days: 3
+      - name: Preserve sanitized native UI evidence after a failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lsc-ios-ui-debug-${{ github.run_number }}
+          path: |
+            ${{ runner.temp }}/lsc-ios-artifacts/native-ui-validation.json
+            ${{ runner.temp }}/lsc-ios-artifacts/native-ui-screenshots/*.png
+          if-no-files-found: warn
+          retention-days: 3
