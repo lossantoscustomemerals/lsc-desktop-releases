@@ -1,0 +1,10 @@
+{
+  "repository": "lossantoscustomemerals/lsc-desktop-releases",
+  "publicKey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAqzbvmPWCO/2qQGQ9QJibXqbjsxL+q3I17Cwte+sfZbg=\n-----END PUBLIC KEY-----\n",
+  "feeds": {
+    "installed": "latest-v2.json",
+    "portable": "portable-latest-v2.json"
+  },
+  "legacyPublicKey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAjpPIDN8E8lRMOiDwOtn7AZT735F/xPjChqfSDg5MBo8=\n-----END PUBLIC KEY-----\n",
+  "legacyVersion": "2.0.1"
+}
